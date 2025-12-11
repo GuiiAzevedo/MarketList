@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lista de Compras Avançada</title>
+<style>
+:root {
+    --bg: #f4f4f4;
+    --card: white;
+    --text: #222;
+    --accent: #28a745;
+    --check-color: #ff5722;
+}
+.dark {
+    --bg: #222;
+    --card: #333;
+    --text: #fff;
+    --accent: #4caf50;
+    --check-color: #ff9800;
+}
+body {
+    font-family: Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 20px;
+    transition: 0.3s;
+}
+#app {
+    max-width: 900px;
+    margin: auto;
+    background: var(--card);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 0 12px rgba(0,0,0,0.2);
+}
+h2 {text-align:center; margin-bottom:20px;}
+input, select, button {padding:8px; margin:5px 0; border-radius:6px; border:1px solid #bbb; font-size:16px;}
+button {background: var(--accent); color:white; border:none; cursor:pointer;}
+button:hover {opacity:0.9;}
+ul {list-style:none; padding:0; margin-top:10px;}
+li {background:#ddd; color:#000; padding:10px; border-radius:6px; margin-bottom:10px; display:flex; flex-direction:column;}
+.completed {background:#b7e4b1; text-decoration:line-through;}
+.linha {display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;}
+.check-btn {background: var(--check-color); margin:5px 0; padding:10px 15px; border-radius:6px; color:#fff; font-weight:bold; border:none; cursor:pointer; font-size:16px;}
+.delete-btn {background:red; margin:5px 0; padding:6px; border-radius:5px; color:#fff; border:none; cursor:pointer;}
+.tab-buttons {display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;}
+.tab-buttons button {flex:1;}
+#totalChecked {text-align:right; font-weight:bold; margin-top:10px;}
+#top-buttons {display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+#top-buttons button {flex:1;}
+#inputs {display:flex; flex-wrap:wrap; gap:10px;}
+#inputs input, #inputs select {flex:1 1 150px;}
+#search-input {width:100%; padding:8px; margin-bottom:10px; border-radius:6px; border:1px solid #bbb; font-size:16px;}
+.category-section {margin-top:15px;}
+.category-section h3 {margin-bottom:5px;}
+</style>
+</head>
+<body>
+<div id="app">
+<h2>🛒 Lista de Compras</h2>
+
+<div id="top-buttons">
+    <button onclick="toggleDarkMode()">🌙 Tema Escuro/Claro</button>
+    <button onclick="limparLista()" style="background:#d9534f">🗑 Limpar Lista</button>
+    <button onclick="exportarLista()" style="background:#007bff">📤 Exportar Lista</button>
+    <button onclick="carregarSugestao()" style="background:#ffa500">💡 Carregar Sugestões</button>
+</div>
+
+<div class="tab-buttons">
+    <button onclick="abrirAba('todos')">📋 Todos os Itens</button>
+    <button onclick="abrirAba('checados')">✅ Itens Pegos</button>
+    <button onclick="abrirAba('categoria')">📂 Por Categoria</button>
+</div>
+
+<div id="aba-todos">
+    <input type="text" id="search-input" placeholder="🔍 Buscar item..." oninput="render()">
+    <div id="inputs">
+        <input type="text" id="nome" placeholder="Nome do produto">
+        <input type="number" id="valor" placeholder="Valor" step="0.01" min="0">
+        <input type="number" id="quantidade" placeholder="Quantidade" step="1" min="1">
+        <select id="categoria">
+            <option>Hortifruti</option>
+            <option>Carnes</option>
+            <option>Laticínios</option>
+            <option>Mercearia</option>
+            <option>Higiene</option>
+            <option>Limpeza</option>
+            <option>Bebidas</option>
+            <option>Outros</option>
+        </select>
+    </div>
+    <button onclick="addItem()">➕ Adicionar Item</button>
+    <ul id="lista"></ul>
+</div>
+
+<div id="aba-checados" style="display:none;">
+    <ul id="lista-checados"></ul>
+    <div id="totalChecked">Total: R$ 0,00</div>
+</div>
+
+<div id="aba-categoria" style="display:none;">
+    <div id="categoria-lista"></div>
+</div>
+
+</div>
+
+<script>
+let lista = JSON.parse(localStorage.getItem("listaCompleta")) || [];
+let darkMode = JSON.parse(localStorage.getItem("darkMode")) || false;
+if(darkMode) document.body.classList.add("dark");
+
+const sugestao = [
+    {nome:"Arroz", valor:10, quantidade:1, categoria:"Mercearia", checado:false},
+    {nome:"Feijão", valor:8, quantidade:1, categoria:"Mercearia", checado:false},
+    {nome:"Leite", valor:5, quantidade:2, categoria:"Laticínios", checado:false},
+    {nome:"Ovos", valor:12, quantidade:12, categoria:"Laticínios", checado:false},
+    {nome:"Tomate", valor:7, quantidade:4, categoria:"Hortifruti", checado:false},
+    {nome:"Alface", valor:4, quantidade:1, categoria:"Hortifruti", checado:false},
+    {nome:"Sabonete", valor:3, quantidade:2, categoria:"Higiene", checado:false},
+    {nome:"Detergente", valor:6, quantidade:1, categoria:"Limpeza", checado:false}
+];
+
+function salvar(){
+    localStorage.setItem("listaCompleta", JSON.stringify(lista));
+    localStorage.setItem("darkMode", JSON.stringify(darkMode));
+}
+
+function abrirAba(aba){
+    document.getElementById("aba-todos").style.display = aba==='todos' ? 'block' : 'none';
+    document.getElementById("aba-checados").style.display = aba==='checados' ? 'block' : 'none';
+    document.getElementById("aba-categoria").style.display = aba==='categoria' ? 'block' : 'none';
+    if(aba==='checados') renderChecados();
+    if(aba==='categoria') renderCategoria();
+}
+
+function toggleDarkMode(){
+    darkMode = !darkMode;
+    document.body.classList.toggle("dark");
+    salvar();
+}
+
+function render(){
+    const filtro = document.getElementById("search-input").value.toLowerCase();
+    const ul = document.getElementById("lista");
+    ul.innerHTML = "";
+    lista.forEach((item,i)=>{
+        if(filtro && !item.nome.toLowerCase().includes(filtro) && !item.categoria.toLowerCase().includes(filtro)) return;
+        let li = document.createElement("li");
+        li.innerHTML = `
+            <div class="linha">
+                <strong>${item.nome}</strong>
+                <div style="display:flex; gap:5px;">
+                    Valor: <input type="number" value="${item.valor}" min="0" step="0.01" style="width:70px" onchange="atualizarValor(${i}, this.value)">
+                    Qtde: <input type="number" value="${item.quantidade}" min="1" style="width:50px" onchange="atualizarQuantidade(${i}, this.value)">
+                </div>
+            </div>
+            <span>Categoria: ${item.categoria}</span>
+            <div class="linha" style="gap:5px; flex-wrap:wrap;">
+                <button class="check-btn" onclick="checkItem(${i})">${item.checado?'✅ PEGOU':'☑️ CHECK'}</button>
+                <button class="delete-btn" onclick="remover(${i})">Excluir</button>
+            </div>
+        `;
+        ul.appendChild(li);
+    });
+    salvar();
+}
+
+function renderChecados(){
+    const ul = document.getElementById("lista-checados");
+    ul.innerHTML = "";
+    let total = 0;
+    lista.filter(item=>item.checado).forEach(item=>{
+        let subtotal = parseFloat(item.valor)*parseInt(item.quantidade);
+        total += subtotal;
+        let li = document.createElement("li");
+        li.innerHTML = `<strong>${item.nome} x${item.quantidade}</strong> - R$ ${subtotal.toFixed(2)}`;
+        ul.appendChild(li);
+    });
+    document.getElementById("totalChecked").innerText = "Total: R$ " + total.toFixed(2);
+}
+
+function renderCategoria(){
+    const container = document.getElementById("categoria-lista");
+    container.innerHTML = "";
+    const categorias = [...new Set(lista.map(item=>item.categoria))];
+    categorias.forEach(cat=>{
+        const section = document.createElement("div");
+        section.className = "category-section";
+        const h3 = document.createElement("h3");
+        h3.innerText = cat;
+        section.appendChild(h3);
+        const ul = document.createElement("ul");
+        lista.filter(item=>item.categoria===cat).forEach(item=>{
+            const li = document.createElement("li");
+            li.innerHTML = `${item.nome} x${item.quantidade} - R$ ${item.valor.toFixed(2)} ${item.checado?'✅':''}`;
+            ul.appendChild(li);
+        });
+        section.appendChild(ul);
+        container.appendChild(section);
+    });
+}
+
+function addItem(){
+    const nome = document.getElementById("nome").value.trim();
+    const valor = parseFloat(document.getElementById("valor").value) || 0;
+    const quantidade = parseInt(document.getElementById("quantidade").value) || 1;
+    const categoria = document.getElementById("categoria").value;
+    if(!nome) return alert("Digite o nome do produto!");
+    lista.push({nome, valor, quantidade, categoria, checado:false});
+    document.getElementById("nome").value="";
+    document.getElementById("valor").value="";
+    document.getElementById("quantidade").value="";
+    render();
+}
+
+function atualizarValor(i,v){ lista[i].valor = parseFloat(v)||0; salvar(); renderChecados(); renderCategoria();}
+function atualizarQuantidade(i,q){ lista[i].quantidade = parseInt(q)||1; salvar(); renderChecados(); renderCategoria();}
+
+function checkItem(i){ lista[i].checado = !lista[i].checado; salvar(); render(); renderChecados(); renderCategoria();}
+function remover(i){ lista.splice(i,1); salvar(); render(); renderChecados(); renderCategoria();}
+
+function limparLista(){
+    if(confirm("Deseja apagar toda a lista?")){
+        lista=[];
+        render();
+        renderChecados();
+        renderCategoria();
+    }
+}
+
+function exportarLista(){
+    if(lista.length===0) return alert("Lista vazia!");
+    let texto = "🛒 Lista de Compras:\n\n";
+    lista.forEach(item=>{
+        texto += `${item.nome} x${item.quantidade} - R$ ${item.valor.toFixed(2)} ${item.checado?"(PEGOU)":""}\nCategoria: ${item.categoria}\n\n`;
+    });
+    texto += document.getElementById("totalChecked").innerText + "\n";
+    navigator.clipboard.writeText(texto).then(()=> alert("Lista copiada para área de transferência!"));
+}
+
+function carregarSugestao(){
+    if(confirm("Deseja carregar a lista de sugestões pré-definida?")) {
+        lista = sugestao.map(item=>({...item}));
+        render();
+        renderChecados();
+        renderCategoria();
+    }
+}
+
+render();
+</script>
+</body>
+</html>
